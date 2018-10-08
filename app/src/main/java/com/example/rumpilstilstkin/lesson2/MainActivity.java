@@ -35,17 +35,17 @@ public class MainActivity extends AppCompatActivity {
 
         List<String> liters = Arrays.asList("a", "b", "c", "d");
 
-        Action1<Integer> action = new Action1<Integer>() {
+        Action1<Long> sdf = new Action1<Long>() {
 
             @Override
-            public void call(Integer s) {
+            public void call(Long s) {
                 Log.d("Dto", "onNext " + s);
             }
         };
 
         Observable<Long> observable1 = Observable.interval(5, TimeUnit.SECONDS);
 
-        Observer<Integer> observer = new Observer<Integer>() {
+        Observer<Long> observer = new Observer<Long>() {
 
             @Override
             public void onCompleted() {
@@ -59,13 +59,77 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onNext(Integer s) {
-                Log.d("Dto", "onNext " + (s * 2));
+            public void onNext(Long s) {
+                Log.d("Dto", "onNext " + (s));
             }
         };
 
-        subscription = Observable.just("1", "2", "w3", "43", "5")
-                .mergeWith(Observable.just("1", "7", "30", "3", "1"))
+       // observable1.subscribe(observer);
+
+        Observable<Integer> obs = Observable.just(1, 2, 3, 4);
+
+        /*obs.subscribe(new Observer<Integer>() {
+
+            @Override
+            public void onCompleted() {
+                Log.d("Dto", "onComplate");
+            }
+
+            @Override
+            public void onError(Throwable e) {
+
+            }
+
+            @Override
+            public void onNext(Integer integer) {
+                Log.d("Dto", "onNext + " + integer);
+            }
+        });
+
+       /* Observable.just(1, 32, 3, 4, 44, 5, 8, 2, 99)
+                .filter(new Func1<Integer, Boolean>() {
+
+                    @Override
+                    public Boolean call(Integer integer) {
+                        return integer > 5;
+                    }
+                })
+                .take(5)
+                .distinct()
+                .mergeWith(Observable.just(35530, 12))
+                .map(new Func1<Integer, String>() {
+
+                         @Override
+                         public String call(Integer s) {
+                             return String.valueOf(s * 10);
+                         }
+                     }
+
+                )
+                .subscribe(new Observer<String>() {
+
+                               @Override
+                               public void onCompleted() {
+
+                               }
+
+                               @Override
+                               public void onError(Throwable e) {
+
+                               }
+
+                               @Override
+                               public void onNext(String s) {
+                                   Log.d("Dto", s);
+                               }
+                           }
+                );*/
+
+       // someHot();
+
+        //obs.subscribe(observer);
+
+        Observable.just("2", "13", "y43", "5", "y43", "1", "7", "30", "3", "1")
                 .distinct()
                 .filter(new Func1<String, Boolean>() {
 
@@ -81,19 +145,19 @@ public class MainActivity extends AppCompatActivity {
                         return Integer.parseInt(s);
                     }
                 })
-                .onErrorResumeNext(Observable.just("1", "2", "3")
-                        .map(new Func1<String, Integer>() {
+                .doOnError(new Action1<Throwable>() {
 
-                            @Override
-                            public Integer call(String s) {
-                                return Integer.parseInt(s);
-                            }
-                        })
+                               @Override
+                               public void call(Throwable throwable) {
+                                   Log.d("Dto", "onError");
+                               }
+                           }
+
                 )
-                .onBackpressureBuffer()
-                .subscribe(observer);
-
-        // myOb();
+                .onErrorResumeNext(Observable.just(2, 4, 5));
+        // .onBackpressureBuffer()
+        //  .subscribe(observer);
+         myOb();
     }
 
     private void myOb() {
@@ -101,13 +165,8 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void call(Subscriber<? super Integer> subscriber) {
-                for (int i = 0; i < 10; i++) {
-                    try {
-                        TimeUnit.SECONDS.sleep(1);
-                    }
-                    catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+                for (int i = 0; i < 10000; i++) {
+                    Log.d("Dto", "onCall " + i);
                     if (subscriber.isUnsubscribed()) {
                         return;
                     }
@@ -134,8 +193,16 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onNext(Integer integer) {
-                // main.setText("onNext " + integer);
+               //  main.setText("onNext " + integer);
                 Log.d("Dto", "onNext " + integer);
+                try {
+                    TimeUnit.MILLISECONDS.sleep(200);
+                }
+                catch (InterruptedException e) {
+                    e.printStackTrace();
+                    Log.d("Dto", "interrupted " + e);
+                    return;
+                }
             }
         };
 
@@ -149,9 +216,8 @@ public class MainActivity extends AppCompatActivity {
 
         subscription = Observable
                 .create(onSubscriber)
-                .subscribeOn(Schedulers.computation())
-                .observeOn(Schedulers.io())
-                .map(myFunc)
+                .subscribeOn(Schedulers.io())
+                .onBackpressureBuffer()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(observer);
     }
@@ -159,14 +225,64 @@ public class MainActivity extends AppCompatActivity {
     private void someHot() {
         ConnectableObservable<Long> observable = Observable
                 .interval(1, TimeUnit.SECONDS)
-                .take(5)
                 .replay();
         observable.connect();
+
+        subscription = observable.subscribe(new Action1<Long>() {
+
+            @Override
+            public void call(Long aLong) {
+                Log.d("Dto", "call = " + aLong);
+            }
+        });
     }
 
     public void action(View v) {
         if (subscription != null) {
-            subscription.unsubscribe();
+            if (subscription.isUnsubscribed()) {
+                someHot();
+            }
+            else {
+                subscription.unsubscribe();
+            }
         }
+    }
+
+    private void backpressure() {
+        Observable.interval(100, TimeUnit.MILLISECONDS)
+                .take(60)
+                .subscribeOn(Schedulers.computation())
+                .doOnNext(new Action1<Long>() {
+
+                    @Override
+                    public void call(Long aLong) {
+                        Log.d("Dto", "post " + aLong);
+                    }
+                })
+                .onBackpressureBuffer()
+                .observeOn(Schedulers.io())
+                .subscribe(new Observer<Long>() {
+
+                    @Override
+                    public void onCompleted() {
+                        Log.d("Dto", "onCompleted");
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.d("Dto", "onError " + e);
+                    }
+
+                    @Override
+                    public void onNext(Long aLong) {
+                        Log.d("Dto", "onNext " + aLong);
+                        try {
+                            TimeUnit.MICROSECONDS.sleep(500);
+                        }
+                        catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
     }
 }
